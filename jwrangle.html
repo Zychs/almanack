@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>jwrangle — days</title>
+<script>
+(function () {
+  try {
+    if (new URLSearchParams(location.search || "").get("embedded") === "1") {
+      document.documentElement.setAttribute("data-embedded", "1");
+    }
+  } catch (e) {}
+})();
+</script>
+<style>
+  @font-face { font-family: "OpenDyslexic3"; src: url("/fonts/OpenDyslexic3-Regular.ttf") format("truetype"); font-weight: 400; }
+  @font-face { font-family: "OpenDyslexic3"; src: url("/fonts/OpenDyslexic3-Bold.ttf") format("truetype"); font-weight: 700; }
+  :root {
+    --bg:#0b0f14; --panel:#121820; --line:#1e2833; --ink:#dfe7ef; --dim:#8b9aab;
+    --accent:#4dd0e1;
+    --as-b3:#8aa0b4; --as-b4:#9ec4e4; --as-b6:#7cf7ff; --as-b7:#d6f4ff;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  html[data-type="compact"] body { zoom: 0.82; }
+  html[data-type="dense"] body { zoom: 0.9; }
+  html[data-type="large"] body { zoom: 1.14; }
+  html[data-type="huge"] body { zoom: 1.28; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: "OpenDyslexic3", system-ui, sans-serif; font-size: 15px; line-height: 1.4;
+    display: flex; flex-direction: column;
+  }
+  #picked {
+    flex: 1 1 auto;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 4px; padding: 12px 14px;
+    min-height: 0;
+  }
+  #picked .www { color: var(--dim); font-size: 13px; letter-spacing: .08em; text-transform: uppercase; }
+  #picked .dom { font-weight: 700; font-size: 42px; line-height: 1; color: var(--accent); }
+  #picked .note { color: var(--dim); font-size: 13px; }
+  #msg { font-size: 12px; color: var(--dim); min-height: 1.2em; }
+  #msg.err { color: #ff8a8a; }
+
+  html:not([data-embedded="1"]) #day-strip {
+    padding-left: 96px;
+    padding-right: 230px;
+  }
+  #day-strip {
+    flex: none;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    gap: 6px;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 8px 10px 10px;
+    border-top: 1px solid var(--line);
+    background: #0a1018;
+    overflow: hidden;
+    min-height: 64px;
+  }
+  #day-strip .day-shift {
+    flex: 0 0 40px;
+    width: 40px;
+    min-width: 40px;
+    padding: 0;
+    border-radius: 8px;
+    font-size: 22px;
+    line-height: 1;
+    font-weight: 700;
+    color: var(--accent);
+    background: var(--panel);
+    border: 1px solid var(--line);
+    cursor: pointer;
+  }
+  #day-strip .day-shift:disabled { opacity: 0.28; color: var(--dim); }
+  #day-strip .day-track {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    gap: 4px;
+    overflow: hidden;
+  }
+  #day-strip button.day-chip {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 6px 4px;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    background: var(--panel);
+    color: var(--ink);
+    font: inherit;
+    font-size: 12px;
+    line-height: 1.25;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+  }
+  #day-strip button.day-chip .www { color: var(--dim); font-size: 10px; letter-spacing: .04em; text-transform: uppercase; }
+  #day-strip button.day-chip .dom { font-weight: 700; font-size: 15px; }
+  #day-strip button.day-chip:hover { border-color: var(--accent); color: var(--accent); }
+  #day-strip button.day-chip.on,
+  #day-strip button.day-chip.center {
+    border-color: var(--accent);
+    color: var(--accent);
+    box-shadow: 0 0 0 1px rgba(77, 208, 225, 0.35) inset;
+    flex-grow: 1.35;
+  }
+  #day-strip button.day-chip.center .dom { font-size: 17px; }
+  #day-strip button.day-chip.today .www { color: var(--accent); }
+  #day-strip button.day-chip.thin { opacity: 0.55; }
+  #day-strip button.day-chip[data-usage-shade="b7"] { color: var(--as-b7); border-color: rgba(214,244,255,0.45); }
+  #day-strip button.day-chip[data-usage-shade="b6"] { color: var(--as-b6); }
+  #day-strip button.day-chip[data-usage-shade="b4"] { color: var(--as-b4); }
+  #day-strip button.day-chip[data-usage-shade="b3"] { color: var(--dim); }
+  #day-strip .strip-hint {
+    flex: 1 1 auto;
+    align-self: center;
+    font-size: 11px;
+    color: var(--dim);
+    padding: 0 6px;
+    white-space: nowrap;
+  }
+  html[data-embedded="1"] #picked .dom { font-size: 28px; }
+</style>
+
+<div id="picked">
+  <div class="www" id="pickWww">day</div>
+  <div class="dom" id="pickDom">—</div>
+  <div class="note" id="pickNote">calendar only</div>
+  <div id="msg"></div>
+</div>
+<nav id="day-strip" aria-label="Day calendar — center date is selected">
+  <button type="button" class="day-shift" id="dayPrev" aria-label="Shift to an earlier date">‹</button>
+  <div class="day-track" id="dayTrack" role="listbox" aria-label="Dates in this window"></div>
+  <button type="button" class="day-shift" id="dayNext" aria-label="Shift to a later date">›</button>
+</nav>
+
+<script src="/type-scale.js"></script>
+<script>
+  if (window.TypeScale) {
+    TypeScale.installDocument({
+      storageKey: "artifact-scanner-type-scale-jwrangle",
+      label: "jwrangle",
+    });
+  }
+  const API = (location.protocol === "file:" || !location.port) ? "http://127.0.0.1:8765" : "";
+  const STORE = "artifact-scanner-jwrangle-day";
+  const msg = document.getElementById("msg");
+  const strip = document.getElementById("day-strip");
+  const track = document.getElementById("dayTrack");
+  const prevBtn = document.getElementById("dayPrev");
+  const nextBtn = document.getElementById("dayNext");
+  let selectedIso = null;
+  let centerIso = null;
+  let allDays = [];
+  let todayIso = "";
+  const CHIP_MIN = 52;
+  const CHIP_GAP = 4;
+
+  const esc = s => String(s || "").replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
+  const say = (t, cls) => { msg.textContent = t || ""; msg.className = cls || ""; };
+
+  function parseIso(iso) {
+    const p = String(iso || "").split("-");
+    if (p.length !== 3) return null;
+    const d = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+    return isNaN(d.getTime()) ? null : d;
+  }
+  function toIso(d) {
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  }
+  function addDays(iso, n) {
+    const d = parseIso(iso);
+    if (!d) return iso;
+    d.setDate(d.getDate() + n);
+    return toIso(d);
+  }
+  function wwwOf(iso) {
+    const d = parseIso(iso);
+    return d ? ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d.getDay()] : "";
+  }
+  function domOf(iso) {
+    const d = parseIso(iso);
+    return d ? d.getDate() : Number(String(iso).slice(-2));
+  }
+
+  function buildCalendar(apiDays, today) {
+    const byIso = {};
+    (apiDays || []).forEach(d => { if (d && d.iso) byIso[d.iso] = d; });
+    const start = (apiDays && apiDays.length) ? apiDays[0].iso : today;
+    const out = [];
+    let cur = start;
+    let guard = 0;
+    while (cur <= today && guard < 400) {
+      const hit = byIso[cur];
+      out.push(hit || {
+        iso: cur, www: wwwOf(cur), dom: domOf(cur),
+        has_day_md: false, is_today: cur === today, usage: 0,
+      });
+      cur = addDays(cur, 1);
+      guard += 1;
+    }
+    if (!out.some(d => d.iso === today)) {
+      out.push(byIso[today] || {
+        iso: today, www: wwwOf(today), dom: domOf(today),
+        has_day_md: false, is_today: true, usage: 0,
+      });
+    }
+    return out;
+  }
+
+  function chipsThatFit() {
+    if (!track) return 1;
+    const w = track.clientWidth || 0;
+    if (w <= 0) return 1;
+    let n = Math.floor((w + CHIP_GAP) / (CHIP_MIN + CHIP_GAP));
+    n = Math.max(1, n);
+    if (n % 2 === 0) n -= 1;
+    return Math.max(1, n);
+  }
+
+  function visibleSlice() {
+    const n = Math.min(chipsThatFit(), allDays.length || 1);
+    if (!allDays.length) return [];
+    let idx = allDays.findIndex(d => d.iso === centerIso);
+    if (idx < 0) idx = allDays.length - 1;
+    let start = idx - Math.floor(n / 2);
+    let end = start + n;
+    if (start < 0) { end += -start; start = 0; }
+    if (end > allDays.length) {
+      start = Math.max(0, start - (end - allDays.length));
+      end = allDays.length;
+    }
+    return allDays.slice(start, end);
+  }
+
+  function paintPicked() {
+    const iso = selectedIso || centerIso || todayIso;
+    const d = allDays.find(x => x.iso === iso) || { iso: iso, www: wwwOf(iso), dom: domOf(iso) };
+    document.getElementById("pickWww").textContent = (d.www || wwwOf(iso)) + (d.is_today ? " · today" : "");
+    document.getElementById("pickDom").textContent = String(d.dom != null ? d.dom : domOf(iso));
+    const id = d.day_id || iso;
+    document.getElementById("pickNote").textContent = d.has_day_md
+      ? (id + (d.usage ? " · use " + d.usage : ""))
+      : (id + " · no day.md");
+  }
+
+  function paintStrip() {
+    if (!track) return;
+    if (!allDays.length) {
+      track.innerHTML = '<span class="strip-hint">no day boards under jwrangle/days</span>';
+      if (prevBtn) prevBtn.disabled = true;
+      if (nextBtn) nextBtn.disabled = true;
+      return;
+    }
+    if (!centerIso) centerIso = selectedIso || todayIso || allDays[allDays.length - 1].iso;
+    if (centerIso > todayIso) centerIso = todayIso;
+    if (!allDays.some(d => d.iso === centerIso)) {
+      centerIso = allDays[allDays.length - 1].iso;
+    }
+    const vis = visibleSlice();
+    const sel = selectedIso || centerIso;
+    track.innerHTML = vis.map(d => {
+      const cls = [
+        "day-chip",
+        d.is_today ? "today" : "",
+        d.has_day_md ? "" : "thin",
+        d.iso === centerIso ? "center" : "",
+        d.iso === sel ? "on" : "",
+      ].filter(Boolean).join(" ");
+      const shade = d.usage_shade || "";
+      const label = (d.day_id || d.iso) + (d.has_day_md ? "" : " (no day.md)") +
+        (d.usage != null ? " · use " + d.usage : "") +
+        (d.iso === centerIso ? " · centered" : "");
+      return '<button type="button" class="' + cls + '" role="option" data-iso="' + esc(d.iso) +
+        (shade ? '" data-usage-shade="' + esc(shade) : "") +
+        '" aria-selected="' + (d.iso === centerIso ? "true" : "false") +
+        '" aria-label="' + esc(label) + '">' +
+        '<span class="www">' + esc(d.www || wwwOf(d.iso)) + '</span>' +
+        '<span class="dom">' + esc(String(d.dom != null ? d.dom : domOf(d.iso))) + '</span>' +
+        '</button>';
+    }).join("");
+    track.querySelectorAll("button.day-chip").forEach(b => {
+      b.addEventListener("click", () => pickDay(b.dataset.iso));
+    });
+    const i = allDays.findIndex(d => d.iso === centerIso);
+    if (prevBtn) prevBtn.disabled = i <= 0;
+    if (nextBtn) nextBtn.disabled = i < 0 || i >= allDays.length - 1;
+    paintPicked();
+  }
+
+  function pickDay(iso) {
+    if (!iso) return;
+    if (iso > todayIso) iso = todayIso;
+    centerIso = iso;
+    selectedIso = iso;
+    try { localStorage.setItem(STORE, iso); } catch (e) {}
+    paintStrip();
+  }
+
+  function shiftCenter(delta) {
+    if (!centerIso) return;
+    const next = addDays(centerIso, delta);
+    if (!allDays.some(d => d.iso === next)) return;
+    pickDay(next);
+  }
+
+  async function loadDayStrip() {
+    if (!strip || !track) return;
+    try {
+      const saved = localStorage.getItem(STORE);
+      if (saved) selectedIso = saved;
+    } catch (e) {}
+    try {
+      const r = await fetch(API + "/api/reconstruct/days?limit=60");
+      const j = await r.json();
+      todayIso = (j && j.today) || toIso(new Date());
+      if (!j.ok || !j.days || !j.days.length) {
+        allDays = buildCalendar([], todayIso);
+        paintStrip();
+        return;
+      }
+      allDays = buildCalendar(j.days, todayIso);
+      if (!centerIso) centerIso = selectedIso || todayIso;
+      if (selectedIso && !allDays.some(d => d.iso === selectedIso)) selectedIso = todayIso;
+      paintStrip();
+    } catch (e) {
+      track.innerHTML = '<span class="strip-hint">day strip offline</span>';
+      say("server unreachable :8765", "err");
+    }
+  }
+
+  if (prevBtn) prevBtn.onclick = () => shiftCenter(-1);
+  if (nextBtn) nextBtn.onclick = () => shiftCenter(1);
+  if (strip) {
+    strip.tabIndex = 0;
+    strip.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowLeft") { e.preventDefault(); shiftCenter(-1); }
+      if (e.key === "ArrowRight") { e.preventDefault(); shiftCenter(1); }
+    });
+  }
+  let resizeTick = 0;
+  function onMorph() {
+    if (resizeTick) cancelAnimationFrame(resizeTick);
+    resizeTick = requestAnimationFrame(() => {
+      resizeTick = 0;
+      paintStrip();
+    });
+  }
+  if (typeof ResizeObserver === "function" && (track || strip)) {
+    const ro = new ResizeObserver(onMorph);
+    ro.observe(track || strip);
+  }
+  window.addEventListener("resize", onMorph);
+  loadDayStrip();
+</script>
+<script src="/cth-hover.js?v=2"></script>
+<script src="/suite-zip.js?v=9"></script>
